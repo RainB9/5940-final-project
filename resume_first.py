@@ -142,6 +142,10 @@ elif st.session_state["selected_job"] is not None:
         )
         vectorstore = FAISS.from_documents(documents, embeddings)
         retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 2})
+        for doc in documents:
+            embedding = embeddings.embed_query(doc.page_content)
+            # st.write(f"Embedding for document: {doc.page_content[:50]}...")  
+            # st.write(embedding[:10])
 
         relevant_docs = retriever.get_relevant_documents(question)
         context = "\n\n".join([doc.page_content for doc in relevant_docs])
