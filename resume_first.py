@@ -17,7 +17,7 @@ st.title("AI Job Assistant")
 # Set up OpenAI proxy client
 client = openai.OpenAI(
     api_key="sk-fU_9e80K6l4Erj8Ls_KlHQ",  
-    base_url="api.ai.it.cornell.edu"  
+    base_url="https://api.ai.it.cornell.edu"
 )
 
 # Initialize session state for uploaded resume, job search results, and selected job
@@ -138,8 +138,10 @@ elif st.session_state["selected_job"] is not None:
         documents = [Document(page_content=st.session_state["resume_text"])]
         embeddings = OpenAIEmbeddings(
             api_key="sk-fU_9e80K6l4Erj8Ls_KlHQ",  
-            base_url="api.ai.it.cornell.edu"  
+            base_url="https://api.ai.it.cornell.edu",
+            model="openai.text-embedding-3-small"
         )
+        
         vectorstore = FAISS.from_documents(documents, embeddings)
         retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 2})
 
@@ -147,7 +149,7 @@ elif st.session_state["selected_job"] is not None:
         context = "\n\n".join([doc.page_content for doc in relevant_docs])
 
         # Generate response
-        prompt = PromptTemplate.from_template("""
+        prompt_template = """
             You are an assistant for job applications. Use the following resume context to answer the question. 
             If you don't know the answer, say that you don't know. Answer concisely.
 
@@ -157,15 +159,19 @@ elif st.session_state["selected_job"] is not None:
 
             Answer:
         """
+
+        formatted_prompt = prompt_template.format(
+            question=question,
+            context=context
         )
 
-        rag_chain = (
-            {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
-            | prompt
-            | client.chat.completions.create
-            | StrOutputParser()
+        # Updated chat completion with correct model name
+        response = client.chat.completions.create(
+            model="openai.gpt-4o",
+            messages=[{"role": "user", "content": formatted_prompt}]
         )
+        
+        assistant_response = response.choices[0].message.content
+        st.chat_message("assistant").write(assistant_response)
+        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
 
-        response = rag_chain.invoke({"context": context, "question": question})
-        st.chat_message("assistant").write(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
