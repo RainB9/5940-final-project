@@ -14,7 +14,8 @@ from langchain_experimental.text_splitter import SemanticChunker
 from langchain.vectorstores import FAISS
 from jobspy import scrape_jobs
 import pandas as pd
-
+from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAI
 # Streamlit setup
 st.title("AI Job Assistant")
 

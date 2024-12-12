@@ -1,18 +1,38 @@
 FROM public.ecr.aws/docker/library/python:3.11-slim-bookworm as base
 
-RUN pip install --no-cache "poetry>1.7,<1.8" 
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libglib2.0-0 \
+    libfreetype6-dev \
+    libxext6 \
+    libxrender1 \
+    libsm6 \
+    libffi-dev \
+    libz-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libopenblas-dev \
+    libpoppler-cpp-dev \
+    pkg-config \
+    poppler-utils \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN pip install --no-cache-dir "poetry>1.7,<1.8"
 RUN poetry config virtualenvs.create false
-# install PyPDF2
-RUN pip install PyPDF2
 
 WORKDIR /code
 
 COPY ./pyproject.toml ./poetry.lock* ./
 
+# Install project dependencies
 RUN poetry install --no-dev --no-interaction --no-ansi --no-root -vv \
     && rm -rf /root/.cache/pypoetry
 
-
+# Install additional Python packages
 RUN pip install --no-cache-dir \
     pymupdf \
     langchain \
@@ -24,9 +44,10 @@ RUN pip install --no-cache-dir \
     python-jobspy \
     markdownify
 
-RUN apt-get update && apt-get install -y curl \
+# Install Node.js and npm packages
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && curl -fsSL https://deb.nodesource.com/setup_16.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install dotenv
@@ -34,40 +55,36 @@ RUN npm install dotenv
 # Dev Container
 FROM base as devcontainer
 
-RUN apt-get update \
-    && apt-get install -y \
+# Install additional development tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     unzip \
     vim \
-    wget \
     ffmpeg \
-    gcc \
-    python3-dev \
     sqlite3 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean 
+    && rm -rf /var/lib/apt/lists/*
 
+# Install AWS CLI
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
     && ./aws/install --update \
     && echo 'complete -C '/usr/local/bin/aws_completer' aws' >> ~/.bashrc \
     && rm -rf awscliv2.zip ./aws
 
-RUN poetry install --all-extras --no-interaction --no-ansi --no-root -vv \
-    && rm -rf /root/.cache/pypoetry
-
-# Install gnupg and add the Neo4j repository securely
-RUN apt-get update && apt-get install -y gnupg wget \
+# Install Neo4j Cypher Shell
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg \
     && wget -qO - https://debian.neo4j.com/neotechnology.gpg.key | gpg --dearmor > /usr/share/keyrings/neo4j-archive-keyring.gpg \
     && echo 'deb [signed-by=/usr/share/keyrings/neo4j-archive-keyring.gpg] https://debian.neo4j.com stable 5' > /etc/apt/sources.list.d/neo4j.list \
     && apt-get update \
-    && apt-get install -y cypher-shell \
+    && apt-get install -y --no-install-recommends cypher-shell \
     && rm -rf /var/lib/apt/lists/*
 
+# Download Neo4j movies example
 RUN mkdir -p /init \
     && wget https://github.com/neo4j-graph-examples/movies/raw/main/scripts/movies.cypher \
     -O /init/001-load-movies.cypher
+
 # Download the Chinook SQL script
 RUN wget https://raw.githubusercontent.com/lerocha/chinook-database/master/ChinookDatabase/DataSources/Chinook_Sqlite.sql -O /code/Chinook_Sqlite.sql
 
@@ -77,4 +94,3 @@ RUN sqlite3 /code/Chinook.db ".read /code/Chinook_Sqlite.sql"
 WORKDIR /workspace
 
 CMD ["tail", "-f", "/dev/null"]
-
