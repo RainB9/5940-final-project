@@ -102,7 +102,10 @@ if st.session_state["resume_uploaded"] and st.session_state["selected_job"] is N
             with st.expander(f"{job['title']} at {job['company']}"):
                 st.write(f"**Location:** {job.get('location', 'Location not specified')}")
                 st.write(f"**Job Type:** {job.get('job_type', 'Not provided')}")
-                st.write(f"**Description:** {job.get('description', 'No description available')[:500]}...")
+                description = job.get('description', 'No description available')
+                description = str(description)  # 确保是字符串
+                st.write(f"**Description:** {description[:500]}...")
+
 
                 if st.button("Select This Job", key=f"select_job_{idx}"):
                     st.session_state["selected_job"] = job
