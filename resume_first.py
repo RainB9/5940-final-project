@@ -10,6 +10,9 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 from jobspy import scrape_jobs
 import pandas as pd
+import faiss
+import numpy as np
+from match_alg import extract_skills_with_gpt, extract_experience_with_gpt, skill_match_score, calculate_final_score,calculate_similarity_score
 
 # Streamlit setup
 st.title("AI Job Assistant")
@@ -18,6 +21,11 @@ st.title("AI Job Assistant")
 client = openai.OpenAI(
     api_key="sk-fU_9e80K6l4Erj8Ls_KlHQ",  
     base_url="https://api.ai.it.cornell.edu"  
+)
+embeddings = OpenAIEmbeddings(
+        api_key="sk-fU_9e80K6l4Erj8Ls_KlHQ",
+        base_url="https://api.ai.it.cornell.edu",
+        model="openai.text-embedding-3-small"
 )
 
 # Initialize session state for uploaded resume, job search results, and selected job
@@ -51,12 +59,39 @@ def search_jobs(search_term, location, job_type, days_old):
             search_term=search_term,
             location=location,
             job_type=job_type,
-            hours_old=days_old * 24  # Convert days to hours
+            hours_old=days_old * 24,  # Convert days to hours
         )
         return jobs
     except Exception as e:
         st.error(f"Error searching jobs: {str(e)}")
         return pd.DataFrame()
+
+# Function to handle job and resume matching
+def handle_matching(resume_text, job_description,embeddings):
+    
+    resume_skills = extract_skills_with_gpt(resume_text)
+    job_skills = extract_skills_with_gpt(job_description)
+    skill_score, matched_skills = skill_match_score(resume_skills, job_skills)
+    
+    resume_years = extract_experience_with_gpt(resume_text)
+    required_years = extract_experience_with_gpt(job_description)
+    
+    experience_score = resume_years / required_years if required_years > 0 else 1.0
+    experience_score = min(experience_score, 1.0)  
+
+    resume_embedding = embeddings.embed_query(resume_text)
+    job_embedding = embeddings.embed_query(job_description)
+    similarity_score = calculate_similarity_score(resume_embedding, job_embedding)
+
+    final_score = calculate_final_score(similarity_score, skill_score, experience_score)
+    return {
+        "similarity_score": similarity_score,
+        "skill_score": skill_score,
+        "experience_score": experience_score,
+        "final_score": final_score,
+        "matched_skills": matched_skills,
+    }
+
 
 # Resume upload interface
 if not st.session_state["resume_uploaded"]:
@@ -65,6 +100,8 @@ if not st.session_state["resume_uploaded"]:
     if uploaded_file:
         st.session_state["resume_file"] = uploaded_file  # Save the file reference
         st.session_state["resume_text"] = process_resume(uploaded_file)
+        st.session_state["resume_skills"] = extract_skills_with_gpt(st.session_state["resume_text"])
+        st.session_state["resume_experience"] = extract_experience_with_gpt(st.session_state["resume_text"])
         st.session_state["resume_uploaded"] = True
         st.success("Resume uploaded successfully! Proceed to job search below.")
 
@@ -103,7 +140,7 @@ if st.session_state["resume_uploaded"] and st.session_state["selected_job"] is N
                 st.write(f"**Location:** {job.get('location', 'Location not specified')}")
                 st.write(f"**Job Type:** {job.get('job_type', 'Not provided')}")
                 description = job.get('description', 'No description available')
-                description = str(description)  # 确保是字符串
+                description = str(description)  
                 st.write(f"**Description:** {description[:500]}...")
 
 
@@ -116,6 +153,19 @@ if st.session_state["resume_uploaded"] and st.session_state["selected_job"] is N
 elif st.session_state["selected_job"] is not None:
     if st.button("← Back to Job Search"):
         st.session_state["selected_job"] = None
+
+    job_description = st.session_state["selected_job"]["description"]
+    
+    matching_results = handle_matching(
+        st.session_state["resume_text"],
+        job_description,
+        embeddings
+    )
+    st.write(f"Similarity Score: {matching_results['similarity_score']:.2f}")
+    st.write(f"Skill Match Score: {matching_results['skill_score']:.2f}")
+    st.write(f"Experience Match Score: {matching_results['experience_score']:.2f}")
+    st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
+    st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
     st.header(f"Selected Job: {st.session_state['selected_job']['title']}")
     st.subheader(f"Company: {st.session_state['selected_job']['company']}")
@@ -136,24 +186,7 @@ elif st.session_state["selected_job"] is not None:
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
         st.chat_message("user").write(question)
-
-        # Set up vectorstore for retrieving context
-        documents = [Document(page_content=st.session_state["resume_text"])]
-        embeddings = OpenAIEmbeddings(
-            api_key="sk-fU_9e80K6l4Erj8Ls_KlHQ",  
-            base_url="https://api.ai.it.cornell.edu",
-            model="openai.text-embedding-3-small"
-        )
-        vectorstore = FAISS.from_documents(documents, embeddings)
-        retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 2})
-        for doc in documents:
-            embedding = embeddings.embed_query(doc.page_content)
-            # st.write(f"Embedding for document: {doc.page_content[:50]}...")  
-            # st.write(embedding[:10])
-
-        relevant_docs = retriever.get_relevant_documents(question)
-        context = "\n\n".join([doc.page_content for doc in relevant_docs])
-
+        context = f"Resume:\n{st.session_state['resume_text']}\n\nJob Description:\n{st.session_state['selected_job']['description']}"
         # Generate response
         prompt_template = """
             You are an assistant for job applications. Use the following resume context to answer the question. 
