@@ -34,7 +34,7 @@ def extract_skills_with_gpt(text):
 
 def extract_years_from_text(text):
     try:
-        match = re.search(r"(\d+(\.\d+)?)\s*(年|月|years?|months?)", text, re.IGNORECASE)
+        match = re.search(r"(\d+(\.\d+)?)\s*(years?|months?)", text, re.IGNORECASE)
         if match:
             number = float(match.group(1)) 
             unit = match.group(3).lower()  
