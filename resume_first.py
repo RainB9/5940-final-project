@@ -114,7 +114,7 @@ if st.session_state["resume_uploaded"] and st.session_state["selected_job"] is N
         location = st.text_input("Location", "New York, NY")
         job_type = st.selectbox(
             "Job Type",
-            [None, "Full-time", "Part-time", "Internship", "Contract"]
+            [None, "fulltime", "parttime", "internship", "contract"]
         )
         days_old = st.slider("Posted Within (days)", 1, 30, 7)
 
@@ -129,44 +129,100 @@ if st.session_state["resume_uploaded"] and st.session_state["selected_job"] is N
                 )
                 if not jobs_df.empty:
                     st.session_state["jobs_df"] = jobs_df
-                    st.success(f"Found {len(jobs_df)} jobs!")
                 else:
                     st.error("No jobs found or error occurred during search.")
 
     # Display job search results
     if st.session_state["jobs_df"] is not None:
-        st.subheader("Search Results")
-        for idx, job in st.session_state["jobs_df"].iterrows():
-            with st.expander(f"{job['title']} at {job['company']}"):
-                st.write(f"**Location:** {job.get('location', 'Location not specified')}")
-                st.write(f"**Job Type:** {job.get('job_type', 'Not provided')}")
-                description = job.get('description', 'No description available')
-                description = str(description)  
-                st.write(f"**Description:** {description[:500]}...")
-
-
-                if st.button("Select This Job", key=f"select_job_{idx}"):
-                    st.session_state["selected_job"] = job
-                    st.experimental_set_query_params(selected_job_idx=idx)
-                    st.rerun()
+        # Filter out jobs with no description
+        valid_jobs = st.session_state["jobs_df"].dropna(subset=['description'])
+        
+        if len(valid_jobs) == 0:
+            st.warning("No jobs found in the search results.")
+        else:
+            st.success(f"Found {len(valid_jobs)} jobs")
+            
+            for idx, job in valid_jobs.iterrows():
+                # Clean and prepare job data
+                company_name = str(job.get('company', 'Unknown Company'))
+                job_title = str(job.get('title', 'Untitled Position'))
+                location = str(job.get('location', 'Location not specified'))
+                job_type = str(job.get('job_type', 'Not specified'))
+                description = str(job.get('description', '')).strip()
+                
+                # Handle NaN values
+                if company_name == 'nan': company_name = 'Unknown Company'
+                if job_title == 'nan': job_title = 'Untitled Position'
+                if location == 'nan': location = 'Location not specified'
+                if job_type == 'nan': job_type = 'Not specified'
+                
+                # Create the main job expander
+                with st.expander(f"📋 {job_title} at {company_name}"):
+                    st.write(f"**Location:** {location}")
+                    st.write(f"**Job Type:** {job_type}")
+                    
+                    # Create description section with expansion functionality
+                    if description and description != 'nan':
+                        st.write("**Description:**")
+                        
+                        # Create a unique key for this job's expanded state
+                        expanded_key = f"expanded_{idx}"
+                        if expanded_key not in st.session_state:
+                            st.session_state[expanded_key] = False
+                        
+                        # Find the last complete word within preview length
+                        preview_length = 300
+                        if len(description) > preview_length:
+                            # Find the last space before preview_length
+                            last_space = description[:preview_length].rfind(' ')
+                            preview_text = description[:last_space] + "..."
+                        else:
+                            preview_text = description
+                        
+                        # Display the description content based on state
+                        if st.session_state[expanded_key]:
+                            st.markdown(description)
+                            if st.button("Show less ↑", key=f"expand_{idx}", use_container_width=False):
+                                st.session_state[expanded_key] = False
+                                st.rerun()
+                        else:
+                            st.markdown(preview_text)
+                            if len(description) > preview_length:
+                                if st.button("Show more ↓", key=f"expand_{idx}", use_container_width=False):
+                                    st.session_state[expanded_key] = True
+                                    st.rerun()
+                    else:
+                        st.write("*No description available*")
+                        continue
+                    
+                    st.write("")
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    with col2:
+                        if st.button("Select This Job", key=f"select_job_{idx}", 
+                                    help="Click to see detailed matching analysis for this position",
+                                    use_container_width=True):
+                            st.session_state["selected_job"] = job
+                            st.experimental_set_query_params(selected_job_idx=idx)
+                            st.rerun()
 
 # Chat interface for selected job
 elif st.session_state["selected_job"] is not None:
     if st.button("← Back to Job Search"):
         st.session_state["selected_job"] = None
-
-    job_description = st.session_state["selected_job"]["description"]
-    
-    matching_results = handle_matching(
-        st.session_state["resume_text"],
-        job_description,
-        embeddings
-    )
-    st.write(f"Similarity Score: {matching_results['similarity_score']:.2f}")
-    st.write(f"Skill Match Score: {matching_results['skill_score']:.2f}")
-    st.write(f"Experience Match Score: {matching_results['experience_score']:.2f}")
-    st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
-    st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
+        st.rerun()
+    else:
+        job_description = st.session_state["selected_job"].get("description", "")
+        if job_description:  # Only show matching if we have a description
+            matching_results = handle_matching(
+                st.session_state["resume_text"],
+                job_description,
+                embeddings
+            )
+            st.write(f"Similarity Score: {matching_results['similarity_score']:.2f}")
+            st.write(f"Skill Match Score: {matching_results['skill_score']:.2f}")
+            st.write(f"Experience Match Score: {matching_results['experience_score']:.2f}")
+            st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
+            st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
     # Plotly Visualization
     st.subheader("Match Scores Visualization")
