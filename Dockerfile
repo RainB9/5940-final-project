@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir "poetry>1.7,<1.8"
 RUN poetry config virtualenvs.create false
 RUN pip install PyPDF2
 WORKDIR /code
+RUN pip install plotly
 
 COPY ./pyproject.toml ./poetry.lock* ./
 

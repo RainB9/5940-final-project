@@ -92,8 +92,7 @@ def calculate_similarity_score(resume_embedding, job_embedding):
 
 
 # cal similarity score
-def calculate_final_score(similarity_score, skill_score, experience_score):
-    weights = {"similarity": 0.5, "skills": 0.3, "experience": 0.2}
+def calculate_final_score(similarity_score, skill_score, experience_score, weights):
     final_score = (
         similarity_score * weights["similarity"] +
         skill_score * weights["skills"] +
