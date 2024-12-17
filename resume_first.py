@@ -13,6 +13,7 @@ import pandas as pd
 import faiss
 import numpy as np
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 from match_alg import extract_skills_with_gpt, extract_experience_with_gpt, skill_match_score, calculate_final_score,calculate_similarity_score
 
 # Streamlit setup
@@ -289,13 +290,68 @@ elif st.session_state["selected_job"] is not None:
             st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
             st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
+        #create donut chart for similarity scores
+        def create_donut_chart(score, labels):
+            scores_list = [
+                    score, 1-score]
+            labels_list = labels + [' ']
+            
+            fig, ax = plt.subplots(figsize=(6, 6))
+    
+            # Create the donut
+            wedges, texts, autotexts = ax.pie(
+                scores_list, 
+                labels=labels_list, 
+                autopct='%1.1f%%', 
+                startangle=90, 
+                colors=['green', 'red'],
+                wedgeprops={'width': 0.4}  # Adjust the width of the donut ring
+            )
+            
+            # Add a circle in the middle to create the donut effect
+            center_circle = plt.Circle((0, 0), 0.70, color='white', lw=0)
+            ax.add_artist(center_circle)
+            
+            # Ensure the aspect ratio is equal for a circular shape
+            ax.set_aspect('equal')
+            
+            st.pyplot(fig)
+
+        # Streamlit dashboard setup
+        st.title("Dashboard")
+
+        # Display Similarity, Skill, Experience, and Final Match Scores
+        st.header("Match Scores")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Similarity")
+            st.metric(label="job and resume compatibility", value=f"{matching_results['similarity_score']:.2f}")
+            create_donut_chart(matching_results['similarity_score'], 
+                        ['Similarity'])
+            
+            st.subheader("Experience Match")
+            st.metric(label="Years of experience", value=f"{matching_results['experience_score']:.2f}")
+            create_donut_chart(matching_results['experience_score'], 
+                        ['Experience'])
+            
+        with col2:
+            st.subheader("Skill Match")
+            st.metric(label="skills alignment with job requirements", value=f"{matching_results['skill_score']:.2f}")
+            create_donut_chart(matching_results['skill_score'], 
+                        ['Skills'])
+
+            st.subheader("Final Match")
+            st.metric(label="overall Suitability", value=f"{matching_results['final_score']:.2f}")
+
         # Radar visualization
-        st.subheader("Match Analysis")
+        st.header("Match Analysis")
         radar_fig = create_radar_chart(matching_results)
         st.plotly_chart(radar_fig, use_container_width=True)
 
         # Weight adjustment section
-        st.subheader("Customize Match Score Weights")
+        st.header("Customize Match Score Weights")
         col1, col2, col3 = st.columns(3)
         with col1:
             similarity_weight = st.number_input(
