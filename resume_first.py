@@ -298,7 +298,7 @@ elif st.session_state["selected_job"] is not None:
             
             fig, ax = plt.subplots(figsize=(6, 6))
     
-            # Create the pie chart
+            # Create the donut
             wedges, texts, autotexts = ax.pie(
                 scores_list, 
                 labels=labels_list, 
@@ -336,9 +336,6 @@ elif st.session_state["selected_job"] is not None:
             create_donut_chart(matching_results['experience_score'], 
                         ['Experience'])
             
-            
-            
-            
         with col2:
             st.subheader("Skill Match")
             st.metric(label="skills alignment with job requirements", value=f"{matching_results['skill_score']:.2f}")
@@ -347,16 +344,6 @@ elif st.session_state["selected_job"] is not None:
 
             st.subheader("Final Match")
             st.metric(label="overall Suitability", value=f"{matching_results['final_score']:.2f}")
-        
- 
-            
-
-
-        # Create donut chart for the match scores
-        # create_donut_chart(matching_results, 
-        #                 ['Similarity', 'Skill Match', 'Experience Match', 'Final Match'])
-
-        ##################
 
         # Radar visualization
         st.header("Match Analysis")
