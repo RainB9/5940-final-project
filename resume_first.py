@@ -12,6 +12,7 @@ from jobspy import scrape_jobs
 import pandas as pd
 import faiss
 import numpy as np
+import plotly.graph_objects as go
 from match_alg import extract_skills_with_gpt, extract_experience_with_gpt, skill_match_score, calculate_final_score,calculate_similarity_score
 
 # Streamlit setup
@@ -36,7 +37,7 @@ if "jobs_df" not in st.session_state:
 if "selected_job" not in st.session_state:
     st.session_state["selected_job"] = None
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "Hello! Upload your resume to get started."}]
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hello! Please ask questions about your resume and your match with the job application."}]
 if "resume_uploaded" not in st.session_state:
     st.session_state["resume_uploaded"] = False
 
@@ -223,6 +224,35 @@ elif st.session_state["selected_job"] is not None:
             st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
             st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
+    # Plotly Visualization
+    st.subheader("Match Scores Visualization")
+    scores = {
+        "Similarity Score": matching_results['similarity_score'],
+        "Skill Match Score": matching_results['skill_score'],
+        "Experience Match Score": matching_results['experience_score'],
+        "Final Match Score": matching_results['final_score']
+    }
+    
+    fig = go.Figure(
+        data=[go.Bar(
+            x=list(scores.keys()),
+            y=list(scores.values()),
+            text=[f"{v:.2f}" for v in scores.values()],
+            textposition='auto'
+        )]
+    )
+
+    fig.update_layout(
+        title="Job Matching Scores",
+        xaxis_title="Categories",
+        yaxis_title="Score Scale (0-1)",
+        yaxis=dict(range=[0, 1]),
+        template="plotly_white"
+    )
+
+    st.plotly_chart(fig)
+
+    #Job description
     st.header(f"Selected Job: {st.session_state['selected_job']['title']}")
     st.subheader(f"Company: {st.session_state['selected_job']['company']}")
 
