@@ -93,6 +93,57 @@ def handle_matching(resume_text, job_description,embeddings):
         "matched_skills": matched_skills,
     }
 
+def create_radar_chart(matching_results):
+    # Create categories and scores
+    categories = ['Similarity', 'Skills', 'Experience', 'Overall Match']
+    scores = [
+        matching_results['similarity_score'],
+        matching_results['skill_score'],
+        matching_results['experience_score'],
+        matching_results['final_score']
+    ]
+    
+    fig = go.Figure()
+    
+    # Add scores
+    fig.add_trace(go.Scatterpolar(
+        r=scores,
+        theta=categories,
+        fill='toself',
+        name='Your Match',
+        fillcolor='rgba(67, 147, 195, 0.5)',
+        line=dict(color='rgb(67, 147, 195)')
+    ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1],
+                tickformat='.0%',
+                showline=False,
+                ticks='',
+                gridcolor='rgba(0,0,0,0.1)',
+            ),
+            angularaxis=dict(
+                gridcolor='rgba(0,0,0,0.1)',
+            ),
+            bgcolor='rgba(0,0,0,0.02)',
+        ),
+        showlegend=True,
+        title={
+            'text': 'Job Match Analysis',
+            'y':0.95,
+            'x':0.5,
+            'xanchor': 'center',
+            'yanchor': 'top'
+        },
+        margin=dict(t=100, b=100),
+        height=600,
+    )
+    
+    return fig
+
 
 # Resume upload interface
 if not st.session_state["resume_uploaded"]:
@@ -224,35 +275,13 @@ elif st.session_state["selected_job"] is not None:
             st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
             st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
-    # Plotly Visualization
-    st.subheader("Match Scores Visualization")
-    scores = {
-        "Similarity Score": matching_results['similarity_score'],
-        "Skill Match Score": matching_results['skill_score'],
-        "Experience Match Score": matching_results['experience_score'],
-        "Final Match Score": matching_results['final_score']
-    }
     
-    fig = go.Figure(
-        data=[go.Bar(
-            x=list(scores.keys()),
-            y=list(scores.values()),
-            text=[f"{v:.2f}" for v in scores.values()],
-            textposition='auto'
-        )]
-    )
+    # Radar visualization
+    st.subheader("Match Analysis")
+    radar_fig = create_radar_chart(matching_results)
+    st.plotly_chart(radar_fig, use_container_width=True)
 
-    fig.update_layout(
-        title="Job Matching Scores",
-        xaxis_title="Categories",
-        yaxis_title="Score Scale (0-1)",
-        yaxis=dict(range=[0, 1]),
-        template="plotly_white"
-    )
-
-    st.plotly_chart(fig)
-
-    #Job description
+    # Job description
     st.header(f"Selected Job: {st.session_state['selected_job']['title']}")
     st.subheader(f"Company: {st.session_state['selected_job']['company']}")
 
