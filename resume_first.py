@@ -68,8 +68,7 @@ def search_jobs(search_term, location, job_type, days_old):
         return pd.DataFrame()
 
 # Function to handle job and resume matching
-def handle_matching(resume_text, job_description,embeddings):
-    
+def handle_matching(resume_text, job_description, embeddings, weights=None):
     resume_skills = extract_skills_with_gpt(resume_text)
     job_skills = extract_skills_with_gpt(job_description)
     skill_score, matched_skills = skill_match_score(resume_skills, job_skills)
@@ -78,13 +77,21 @@ def handle_matching(resume_text, job_description,embeddings):
     required_years = extract_experience_with_gpt(job_description)
     
     experience_score = resume_years / required_years if required_years > 0 else 1.0
-    experience_score = min(experience_score, 1.0)  
+    experience_score = min(experience_score, 1.0)
 
     resume_embedding = embeddings.embed_query(resume_text)
     job_embedding = embeddings.embed_query(job_description)
     similarity_score = calculate_similarity_score(resume_embedding, job_embedding)
 
-    final_score = calculate_final_score(similarity_score, skill_score, experience_score)
+    # set default weight
+    default_weights = {"similarity": 0.5, "skills": 0.3, "experience": 0.2}
+    weights = weights if weights else default_weights
+
+    final_score = (
+        similarity_score * weights["similarity"] +
+        skill_score * weights["skills"] +
+        experience_score * weights["experience"]
+    )
     return {
         "similarity_score": similarity_score,
         "skill_score": skill_score,
@@ -92,6 +99,7 @@ def handle_matching(resume_text, job_description,embeddings):
         "final_score": final_score,
         "matched_skills": matched_skills,
     }
+
 
 def create_radar_chart(matching_results):
     # Create categories and scores
@@ -264,22 +272,60 @@ elif st.session_state["selected_job"] is not None:
     else:
         job_description = st.session_state["selected_job"].get("description", "")
         if job_description:  # Only show matching if we have a description
+            # Add initial weights
+            if "weights" not in st.session_state:
+                st.session_state["weights"] = {"similarity": 0.5, "skills": 0.3, "experience": 0.2}
+
             matching_results = handle_matching(
                 st.session_state["resume_text"],
                 job_description,
-                embeddings
+                embeddings,
+                st.session_state["weights"]
             )
+
             st.write(f"Similarity Score: {matching_results['similarity_score']:.2f}")
             st.write(f"Skill Match Score: {matching_results['skill_score']:.2f}")
             st.write(f"Experience Match Score: {matching_results['experience_score']:.2f}")
             st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
             st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
-    
-    # Radar visualization
-    st.subheader("Match Analysis")
-    radar_fig = create_radar_chart(matching_results)
-    st.plotly_chart(radar_fig, use_container_width=True)
+        # Radar visualization
+        st.subheader("Match Analysis")
+        radar_fig = create_radar_chart(matching_results)
+        st.plotly_chart(radar_fig, use_container_width=True)
+
+        # Weight adjustment section
+        st.subheader("Customize Match Score Weights")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            similarity_weight = st.number_input(
+                "Similarity Weight", 
+                min_value=0.0, max_value=1.0, value=st.session_state["weights"]["similarity"], step=0.1
+            )
+        with col2:
+            skill_weight = st.number_input(
+                "Skills Weight", 
+                min_value=0.0, max_value=1.0, value=st.session_state["weights"]["skills"], step=0.1
+            )
+        with col3:
+            experience_weight = st.number_input(
+                "Experience Weight", 
+                min_value=0.0, max_value=1.0, value=st.session_state["weights"]["experience"], step=0.1
+            )
+
+        # Ensure the sum of the weights equals 1
+        total_weight = similarity_weight + skill_weight + experience_weight
+        if total_weight != 1.0:
+            st.error("The sum of the weights must equal 1.0")
+        else:
+            if st.button("Update Weights"):
+                st.session_state["weights"] = {
+                    "similarity": similarity_weight,
+                    "skills": skill_weight,
+                    "experience": experience_weight
+                }
+                st.experimental_rerun()  # Re-run to update matching results
+
 
     # Job description
     st.header(f"Selected Job: {st.session_state['selected_job']['title']}")
