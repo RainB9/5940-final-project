@@ -284,11 +284,11 @@ elif st.session_state["selected_job"] is not None:
                 st.session_state["weights"]
             )
 
-            st.write(f"Similarity Score: {matching_results['similarity_score']:.2f}")
-            st.write(f"Skill Match Score: {matching_results['skill_score']:.2f}")
-            st.write(f"Experience Match Score: {matching_results['experience_score']:.2f}")
-            st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
-            st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
+            # st.write(f"Similarity Score: {matching_results['similarity_score']:.2f}")
+            # st.write(f"Skill Match Score: {matching_results['skill_score']:.2f}")
+            # st.write(f"Experience Match Score: {matching_results['experience_score']:.2f}")
+            # st.write(f"Final Match Score: {matching_results['final_score']:.2f}")
+            # st.write(f"Matched Skills: {', '.join(matching_results['matched_skills'])}")
 
         #create donut chart for similarity scores
         def create_donut_chart(score, labels):
